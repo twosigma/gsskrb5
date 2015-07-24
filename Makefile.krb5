@@ -178,6 +178,7 @@ DOBJS=	dbg_fn$(OBJ)
 TOBJS=  test_api$(OBJ)	misc_sup$(OBJ)
 
 HELP_SRCS   = today.c
+HELP_OBJS   = today$(OBJ)
 HELP_EXE    = today$(EXE)
 HELP_HEADER = today.h
 
@@ -265,7 +266,8 @@ test$(BASE)$(EXE): $(TOBJS) $(STATIC_LIB)
 	$(POSTLINK_EXE)
 
 $(HELP_EXE): $(HELP_SRCS)
-	-$(LINK_EXE) $(LDFLAGS) $(HELP_SRCS) $(EXTRA_LIBS)
+	$(CC) $(CFLAGS) $(XINC) $(DEFINES) $(DEBUG) $(XDEFS) -c $*.c
+	-$(LINK_EXE) $(LDFLAGS) $(HELP_OBJS) $(EXTRA_LIBS)
 	$(POSTLINK_EXE)
 
 sample: $(SHARED_LIB)

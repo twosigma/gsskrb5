@@ -53,8 +53,8 @@ main(int argc, char * argv[] )
 
        fp = fopen(fname, "w");
        if ( NULL==fp ) {
-	   fprintf(stderr, "ERROR: fopen(\"%s\",\"w\") failed: \"%s\"\n",
-	           fname, strerror(errno) );
+	   fprintf(stderr, "ERROR: fopen(\"%s\",\"w\") failed: %d\n",
+	           fname, errno);
        } else{
 	   outfp = fp;
        }
