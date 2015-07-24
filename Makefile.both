@@ -1,0 +1,342 @@
+##########################################################################
+# $Id: Makefile.both,v 1.1 2000/07/19 17:06:43 d019080 Exp $
+##########################################################################
+#
+# Copyright (c) 1997-2000  SAP AG.  All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer. 
+#
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in
+#    the documentation and/or other materials provided with the
+#    distribution.
+#
+# 3. All advertising materials mentioning features or use of this
+#    software must display the following acknowledgment:
+#    "This product includes software developed by SAP AG"
+#
+# 4. The name "SAP AG" must not be used to endorse or promote products
+#    derived from this software without prior written permission.
+#    For written permission, please contact www.press@sap.com
+#
+# 5. Redistributions of any form whatsoever must retain the following
+#    acknowledgment:
+#    "This product includes software developed by SAP AG"
+#
+# THIS SOFTWARE IS PROVIDED BY SAP AG ``AS IS'' AND ANY EXPRESSED
+# OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED. SAP AG SHALL BE LIABLE FOR ANY DAMAGES
+# ARISING OUT OF THE USE OF THIS SOFTWARE ONLY IF CAUSED BY SAP AG´S
+# INTENT OR GROSS NEGLIGENCE. IN CASE SAP AG IS LIABLE UNDER THIS
+# AGREEMENT FOR DAMAGES CAUSED BY SAP AG´S GROSS NEGLIGENCE SAP AG
+# FURTHER SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+# OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT, AND SHALL NOT BE LIABLE IN EXCESS OF THE AMOUNT OF
+# DAMAGES TYPICALLY FORESEEABLE FOR SAP AG, WHICH SHALL IN NO EVENT
+# EXCEED US$ 500.000.- 
+#
+##########################################################################
+
+BASE        = both
+SHARED_BASE = gss$(BASE)
+SHARED_LIB  = $(SHARED_BASE)$(SHARED)
+STATIC_LIB  = lib$(BASE)$(LIBE)
+TEST_EXE    = test$(BASE)$(EXE)
+XINC        = -I.
+
+## definitions for mechanisms that are to be included in our
+## gssapi multi-mechanism
+##
+
+MINIT	     = gss$(BASE)
+
+MECH1_SUBDIR = krb5
+MECH1_LIB    = $(MECH1_SUBDIR)/krb5$(LIBE)
+MECH1_CLEAN  = clean-MECH1
+MECH1_FORCE  = lib-MECH1
+MECH1_DEPS   = $(MDEPHDRS)
+
+MECH2_SUBDIR = ntlm
+MECH2_LIB    = $(MECH2_SUBDIR)/ntlm$(LIBE)
+MECH2_CLEAN  = clean-MECH2
+MECH2_FORCE  = lib-MECH2
+MECH2_DEPS   = $(MDEPHDRS)
+
+MECH3_SUBDIR =
+MECH3_LIB    =
+MECH3_CLEAN  =
+MECH3_FORCE  =
+MECH3_DEPS   =
+
+MECH4_SUBDIR =
+MECH4_LIB    =
+MECH4_CLEAN  =
+MECH4_FORCE  =
+MECH4_DEPS   =
+
+#######################################################################
+##
+## default make environment: Unix
+##
+
+OBJ=.o
+SHARED=.so
+LIBE=.a
+EXE=
+RANLIB=ranlib $@
+AR=ar rcs
+CC=cc
+CMDSEP=;
+MKARGS=
+DLLFLAGS=-fpic
+DEBUG=-g
+CFLAGS=-ansi -Wall
+DEFINES=-DBSD_SOCKETS -DHAVE_GETTIMEOFDAY -DHAVE_PWD_H -DHAVE_UNISTD_H \
+	-DHAVE_UID_T -D_BSD_SOURCE -D_GNU_SOURCE -D_SVID_SOURCE
+SHLD=cc
+SHLDFLAGS=-shared
+SH_LIBS=
+EXTRA_LIBS=
+MAKELIB_SHARED=$(SHLD) $(SHDL_FLAGS) -o $@
+MAKELIB_SHARED_END=$(SH_LIBS)
+COMPILE_EXE=$(CC) -o $@
+REMOVE=rm -f
+
+
+######################################################################
+## list of headers (HDRS) for the generic layer
+## list of sources (GSRCS) and objects (GOBJS) for the generic layer
+## list of sources (DSRCS) of debug fuctions for generic layer
+## list of sources (TSRCS), headers (THDRS) and objects(TOBJS)
+##                                           for simple test program
+##
+
+HDRS=	gssapi_2.h	gss_argm.h	gn_spi.h	gssmaini.h	\
+	mysccs.h	platform.h	sy_defs.h	$(DHDRS)
+
+GSRCS=	acpt_ctx.c	acq_cred.c	add_cred.c	can_name.c	\
+	cmp_name.c	ctx_time.c	del_ctx.c	dsp_name.c	\
+	dsp_stat.c	dup_name.c	exp_ctx.c	exp_name.c	\
+	get_mic.c	gn_token.c	gssmain.c	gssmaini.c	\
+	$(MINIT).c	imp_ctx.c	imp_name.c	in_c_b_m.c	\
+	in_n_f_m.c 	init_ctx.c	inq_cred.c	inq_ctx.c	\
+	oid_func.c	proc_tok.c	rel_buff.c	rel_cred.c	\
+	rel_name.c	unwrap.c	vrfy_mic.c	wrap.c		\
+	ws_limit.c							\
+	sy_funcs.c	sy_shlib.c
+
+DSRCS=	dbg_fn.c
+DHDRS=  dbg_defs.h
+
+MDEPHDRS = gssapi_2.h	gss_argm.h	gn_spi.h	sy_defs.h	$(DHDRS)
+
+TSRCS=  test_api.c 	misc_sup.c
+THDRS=	test_api.h	gssapi_2.h	mysccs.h	platform.h
+
+
+GOBJS=	acpt_ctx$(OBJ)	acq_cred$(OBJ)	add_cred$(OBJ)	can_name$(OBJ)	\
+	cmp_name$(OBJ)	ctx_time$(OBJ)	del_ctx$(OBJ)	dsp_name$(OBJ)	\
+	dsp_stat$(OBJ)	dup_name$(OBJ)	exp_ctx$(OBJ)	exp_name$(OBJ)	\
+	get_mic$(OBJ)	gn_token$(OBJ)	gssmain$(OBJ)	gssmaini$(OBJ)	\
+	$(MINIT)$(OBJ)	imp_ctx$(OBJ)	imp_name$(OBJ)	in_c_b_m$(OBJ)	\
+	in_n_f_m$(OBJ)	init_ctx$(OBJ)	inq_cred$(OBJ)	inq_ctx$(OBJ)	\
+	oid_func$(OBJ)	proc_tok$(OBJ)	rel_buff$(OBJ)	rel_cred$(OBJ)	\
+	rel_name$(OBJ)	unwrap$(OBJ)	vrfy_mic$(OBJ)	wrap$(OBJ)	\
+	ws_limit$(OBJ)							\
+	sy_funcs$(OBJ)	sy_shlib$(OBJ)
+
+DOBJS=	dbg_fn$(OBJ)
+
+TOBJS=  test_api$(OBJ)	misc_sup$(OBJ)
+
+
+
+LIB_SRCS=  $(GSRCS) $(DSRCS)
+
+LIB_OBJS=  $(GOBJS) $(DOBJS)
+
+#####################################################################
+##
+## compose flags and targets for mechanism personalities
+##
+
+MECH_LIBS     =	$(MECH1_LIB) $(MECH2_LIB) $(MECH3_LIB) $(MECH4_LIB)
+MECH_FORCE    = $(MECH1_FORCE) $(MECH2_FORCE) $(MECH3_FORCE) $(MECH4_FORCE)
+XDEFS 	      =	$(MECH1_DEFS) $(MECH2_DEFS) $(MECH3_DEFS) $(MECH4_DEFS)
+CLEAN_TARGETS =	$(MECH1_CLEAN) $(MECH2_CLEAN) $(MECH3_CLEAN) $(MECH4_CLEAN) 
+
+
+#######
+## Inference rule how to compile C-Sources (using DLL flags)
+#######
+
+all: $(MECH_FORCE) $(SHARED_LIB) $(STATIC_LIB) $(TEST_EXE)
+
+
+$(LIB_OBJS):
+	$(CC) $(CFLAGS) $(XINC) $(DEFINES) $(DEBUG) $(DLLFLAGS) $(XDEFS) -c $*.c
+
+$(TOBJS):
+	$(CC) $(CFLAGS) $(XINC) $(DEFINES) $(DEBUG) -c $*.c
+
+#######
+## Targets for building a static and a shared library
+#######
+
+$(SHARED_LIB):	$(LIB_OBJS) $(MECH_LIBS)
+	@echo "-----------------------------------------------------"
+	@echo "Linking DLL '$(SHARED_LIB)'"
+	@echo "-----------------------------------------------------"
+	$(MAKELIB_SHARED) $(LIB_OBJS) $(MECH_LIBS) $(SH_LIBS) $(MAKELIB_SHARED_END)
+	$(POSTLINK_DLL)
+	@echo .
+
+$(STATIC_LIB): $(LIB_OBJS) $(MECH_LIBS)
+	@echo "-----------------------------------------------------"
+	@echo "Linking static library '$(STATIC_LIB)'"
+	@echo "-----------------------------------------------------"
+	$(MAKELIB) $(LIB_OBJS) $(MECH_LIBS)
+	$(MAKELIB_END)
+	@echo .
+
+#######
+## Targets for building a statically and dynamically linked simple test program
+#######
+
+stst$(BASE)$(EXE): $(TOBJS) $(SHARED_LIB)
+	@echo "-----------------------------------------------------"
+	@echo "Linking test program '$@' with static library '$(STATIC_LIB)'"
+	@echo "-----------------------------------------------------"
+	$(LINK_EXE) $(LDFLAGS) $(DEBUG) $(TOBJS) $(STATIC_LIB) $(EXTRA_LIBS)
+	$(POSTLINK_EXE)
+
+test$(BASE)$(EXE): $(TOBJS) $(STATIC_LIB)
+	@echo "-----------------------------------------------------"
+	@echo "Linking test program '$@' with DLL '$(SHARED_LIB)'"
+	@echo "-----------------------------------------------------"
+	$(LINK_EXE) $(LDFLAGS) $(DEBUG) $(TOBJS) $(SHARED_BASE)$(LIBE) $(EXTRA_LIBS)
+	$(POSTLINK_EXE)
+
+
+#######
+## Targets for building mechanism personality libraries in their subdirectories
+#######
+
+$(MECH1_LIB) lib-MECH1: $(MECH1_DEPS)
+	cd $(MECH1_SUBDIR) $(CMDSEP) $(MAKE) $(MKARGS) $(CMDSEP) cd ..
+
+$(MECH2_LIB) lib-MECH2: $(MECH2_DEPS)
+	cd $(MECH2_SUBDIR) $(CMDSEP) $(MAKE) $(MKARGS) $(CMDSEP) cd ..
+
+$(MECH3_LIB) lib-MECH3: $(MECH3_DEPS)
+	cd $(MECH3_SUBDIR) $(CMDSEP) $(MAKE) $(MKARGS) $(CMDSEP) cd ..
+
+$(MECH4_LIB) lib-MECH4: $(MECH4_DEPS)
+	cd $(MECH4_SUBDIR) $(CMDSEP) $(MAKE) $(MKARGS) $(CMDSEP) cd ..
+
+#######
+## Targets for cleaning compiler droppings
+#######
+
+spotless: clean
+	-$(REMOVE) *.exe
+	-$(REMOVE) *.dll
+	-$(REMOVE) *.lib
+	-$(REMOVE) *.pdb
+	-$(REMOVE) *.obj
+	-$(REMOVE) *.sbr
+	-$(REMOVE) *.exp
+
+clean:	$(CLEAN_TARGETS)
+	-$(REMOVE) $(LIB_OBJS)
+	-$(REMOVE) *.sbr
+	-$(REMOVE) *.plg
+	-$(REMOVE) *.ncb
+	-$(REMOVE) *.opt
+	-$(REMOVE) *.dep
+	-$(REMOVE) *.pch /s
+	-$(REMOVE) $(TOBJS)
+	-$(REMOVE) $(STATIC_LIB)
+	-$(REMOVE) $(SHARED_BASE)$(SHARED) $(SHARED_BASE)$(LIBE) $(SHARED_BASE).exp
+	-$(REMOVE) $(TEST_EXE)
+
+clean-MECH1:
+	cd $(MECH1_SUBDIR) $(CMDSEP) \
+		$(MAKE) $(MKARGS) clean $(CMDSEP) \
+		cd ..
+
+clean-MECH2:
+	cd $(MECH2_SUBDIR) $(CMDSEP) \
+		$(MAKE) $(MKARGS) clean $(CMDSEP) \
+		cd ..
+
+clean-MECH3:
+	cd $(MECH3_SUBDIR) $(CMDSEP) \
+		$(MAKE) $(MKARGS) clean $(CMDSEP) \
+		cd ..
+
+clean-MECH4:
+	cd $(MECH4_SUBDIR) $(CMDSEP) \
+		$(MAKE) $(MKARGS) clean $(CMDSEP) \
+		cd ..
+
+###################################################################
+##
+## Dependencies for generic layer:
+##
+
+acpt_ctx$(OBJ):	acpt_ctx.c	$(HDRS)
+acq_cred$(OBJ):	acq_cred.c	$(HDRS)
+add_cred$(OBJ):	add_cred.c	$(HDRS)
+can_name$(OBJ):	can_name.c	$(HDRS)
+cmp_name$(OBJ):	cmp_name.c	$(HDRS)
+ctx_time$(OBJ):	ctx_time.c	$(HDRS)
+dbg_fn$(OBJ):	dbg_fn.c	$(HDRS)
+del_ctx$(OBJ):	del_ctx.c	$(HDRS)
+dsp_name$(OBJ):	dsp_name.c	$(HDRS)
+dsp_stat$(OBJ):	dsp_stat.c	$(HDRS)
+dup_name$(OBJ):	dup_name.c	$(HDRS)
+exp_ctx$(OBJ):	exp_ctx.c	$(HDRS)
+exp_name$(OBJ):	exp_name.c	$(HDRS)
+get_mic$(OBJ):	get_mic.c	$(HDRS)
+gn_token$(OBJ): gn_token.c	$(HDRS)
+gssmain$(OBJ):	gssmain.c	$(HDRS)
+gssmaini$(OBJ):	gssmaini.c	$(HDRS)
+$(MINIT)$(OBJ): $(MINIT).c	$(HDRS)
+imp_ctx$(OBJ):	imp_ctx.c	$(HDRS)
+imp_name$(OBJ):	imp_name.c	$(HDRS)
+in_c_b_m$(OBJ):	in_c_b_m.c	$(HDRS)
+in_n_f_m$(OBJ):	in_n_f_m.c	$(HDRS)
+ind_mech$(OBJ):	ind_mech.c	$(HDRS)
+init_ctx$(OBJ):	init_ctx.c	$(HDRS)
+inq_cred$(OBJ):	inq_cred.c	$(HDRS)
+inq_ctx$(OBJ):	inq_ctx.c	$(HDRS)
+oid_func$(OBJ):	oid_func.c	$(HDRS)
+proc_tok$(OBJ):	proc_tok.c	$(HDRS)
+rel_buff$(OBJ):	rel_buff.c	$(HDRS)
+rel_cred$(OBJ):	rel_cred.c	$(HDRS)
+rel_name$(OBJ):	rel_name.c	$(HDRS)
+unwrap$(OBJ):	unwrap.c	$(HDRS)
+vrfy_mic$(OBJ):	vrfy_mic.c	$(HDRS)
+wrap$(OBJ):	wrap.c		$(HDRS)
+ws_limit$(OBJ):	ws_limit.c	$(HDRS)
+
+sy_funcs$(OBJ): sy_funcs.c	$(HDRS)
+sy_shlib$(OBJ): sy_shlib.c	$(HDRS)
+
+
+misc_sup$(OBJ):	misc_sup.c	$(THDRS)
+test_api$(OBJ): test_api.c	$(THDRS)
+
+
+
+

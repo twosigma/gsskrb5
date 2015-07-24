@@ -1,0 +1,652 @@
+26-Mar-2013: KRB5 Release 1.0.11
+================================
+* (Kerberos-only fix) for occasional gss_acquire_cred() errors.
+
+  The original SmartCard preauthentication bug in Kerberos SSP
+  from Win2K/XP (see 02-Nov-2003 1.0.7 fix) seems still present
+  in Windows 7.  When SmartCard preauthentication is used,
+  AcquireCredentialsHandle() fails with SEC_E_NO_CREDENTIALS
+  when supplying an explicit AuthIdentity structure (with User
+  and Domain filled, but no password) asking for User-specific
+  credentials.  My original fallback acquires default credentials,
+  calls QueryCredentialAttributes() on the default credentials
+  and compares the result to the explicitly supplied name.
+
+  It appears that Microsoft Kerberos SSP may. after some not
+  yet fully determined conditions, erroneously return an
+  incorrect Credential Owner from QueryCredentialAttributes().
+  Potentially it returns the MS-UPN from the SmartCard rather than
+  the Kerberos Principal name from the Kerberos TGT -- which may
+  be confusing when these two differ.  At the Kerberos protocol
+  level, "JohnDoe@SOME.REALM" and "joHNdoE@SOME.REALM" are distinct
+  Kerberos principals, and Windows has a long track record of
+  name canonicalization failures, where it fails to map a
+  (case-insensitive) Windows account name into a correct
+  (case-sensitive) Kerberos principal name.
+  From what I've seen so far, this looks like an API-only bug,
+  because Kerberos Tickets still show the correct Principal name.
+  
+  The weird part of the behaviour is that the incorrect name
+  is returned to a process only after some hours, and once it
+  happens, the affected process will get the incorrect value
+  from QueryCredentialsAttribute() until the process is terminated,
+  while at the same time, other newly started processes will get
+  correct results from QueryCredentialAttributes().
+
+  When gss_acquire_cred() is called with an explicit Kerberos
+  principal name, gsskrb5.dll will now do a case-insensitive
+  comparison (_stricmp() instead of strcmp()) on the result
+  from QueryCredentialAttributes().  This appears to solve
+  the occasional gss_acquire_cred() failures that have been
+  reported after several hours of process runtime, with
+  SmartCards that contain a non-canonical MS-UPN in the
+  User Certificate.
+
+* (Kerberos-only workaround/change)
+
+  In some (not fully determined) usage scenarios and situations,
+  the Microsoft Kerberos SSP fails to automatically refresh
+  the credentials (=TGT) in time, causing the security context
+  lifetime to expire without giving the application a recognizable
+  chance to refresh the security context.
+
+  Another problematic scenario seems to affect SAPgui frontend usage
+  when a security context is attempted by SNC during a long-running
+  transaction (where the progress indicator messages are send from
+  server to client, and all messages client->server are queued).
+  The security context establishment handshake of Kerberos has
+  a time limit (timeout), and when the attempted SNC renegotiation
+  is stalled by the long-running transaction longer than this
+  timeout, the security context refresh handshake fails when
+  the processing of queued messages resumes on the server on
+  completion of the transaction and SAPgui aborts with an error.
+
+  Microsoft Kerberos does not enforce security context expiration
+  on message protection calls, so it is possible to completely
+  disable security context lifetime reporting for gsskrb5.dll
+  through this registry tweak:
+
+  user-specific setting:
+    SubKey:  HKEY_CURRENT_USER\SOFTWARE\SAP\gsskrb5
+    Entry:   ForceCtxNoExpire
+    Type:    REG_DWORD
+    Value:   0 or 1   (default=0)
+
+  machine-wide setting:
+    SubKey:  HKEY_LOCAL_MACHINE\SOFTWARE\SAP\gsskrb5
+    Entry:   ForceCtxNoExpire
+    Type:    REG_DWORD
+    Value:   0 or 1   (default=0)
+
+  Beware: When using 32-bit software on a 64-bit Window OS, the 64-bit
+  registry path is HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\SAP\gsskrb5  
+
+
+* (Kerberos-only workaround/change)
+
+  Attempt to workaround a Bug in Microsoft's S4U2Proxy in certain
+  Citrix and WASP (WebAccess for Sharepoint Services) usage
+  scenarios that involve "Protocol Transition with Constrained
+  Delegation", a Microsoft proprietary hack to subvert the
+  Kerberos protocol and forge Kerberos tickets on the fly.
+
+  Two distinct problems have been observed:
+  1.) QueryCredentialsAttributes(NAMES) on one's own Kerberos
+      credential fails for non-Admin users with SEC_E_INVALID_HANDLE
+
+  2.) Security context establishment to oneself usually fails with
+      SEC_E_UNSUPPORTED_FUNCTION, because oneself is typically not
+      enabled for constrained delegation (and constrained delegation
+      can only be enabled for service principals, at least through
+      the Regular "Delegation" properties tab in the "ActiveDirectory
+      Users and Computers" MMC snap-in.
+
+  The workaround for (1) is automatic, the own credential is
+  assumed to identify the local user, the canonical user name
+  is synthesized from NetWkstaGetUserInfo() in verbatim plus
+  the converted-to-uppercase realm taken from GetUserNameEx(PrincipalName);
+
+  The workaround for (2) has to be explicitly enabled through the windows
+  registry.  (gsskrb5.dll normally tries to validate credentials by
+  attempting a security context establishment with oneself and report
+  an error if that fails.):
+
+  user-specific setting:
+    SubKey:  HKEY_CURRENT_USER\SOFTWARE\SAP\gsskrb5
+    Entry:   ForceIniCredOK
+    Type:    REG_DWORD
+    Value:   0 or 1   (default=0)
+
+  machine-wide setting:
+    SubKey:  HKEY_LOCAL_MACHINE\SOFTWARE\SAP\gsskrb5
+    Entry:   ForceIniCredOK
+    Type:    REG_DWORD
+    Value:   0 or 1   (default=0)
+
+  Beware: When using 32-bit software on a 64-bit Window OS, the 64-bit
+  registry path is HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\SAP\gsskrb5  
+
+
+
+09-Feb-2012: Release 1.0.10 (NTLM Release 1.0.8)
+===============================
+* (Kerberos and NTLM)
+  Fix for the gssapi token decoder (unlikely to affect normal usage)
+
+* (Kerberos-only fix) for Windows name canonicalization goofs.
+
+  Limit the case-correction of the username part in
+  krb5/krb5cred.c:krb5_determine_cred_owner() to machine principals
+  (who can be recognized by a trailing '$' sign on the username,
+  because only for those QueryCredentialsAttribute(NAMES)
+  will unconditionally return garbage (an incorrect Kerberos
+  principal name), and re-use the username part of
+  GetUserNameEx(SamCompatible).
+
+  GetUserName() is seriously broken on windows 2003/Vista/Win7.
+  Different to Win2K and WinXP, it will no longer return
+  the canonical account name as defined in Active Directory,
+  but instead whatever was supplied to the LogonUser function.
+  GetUserNameEx(SamCompatible) only prepends the NT4-Domain
+  name to the incorrect username, GetUserNameEx(NameUserPrincipal)
+  may return the optional UserPrincipalName attribute for the
+  Account, LookupAccountSid(OpenProcessToken(GetCurrentProcess()))
+  will see the same garbage as GetUserNameEx(NameSamCompatible)
+  for one's own SID.  TranslateName(SamCompatible->SamCompatible)
+  seems to actually get a correctly spelled User, but when called
+  on a standalone Windows XP machine, each call to TranslateName()
+  (for ones own name!) will incur a 6.75 seconds delay (OUCH!),
+  and for domain members TranslateName() still has a non-marginal
+  latency/overhead.
+
+  Heuristics suggest that NetWkstaGetUserInfo(level=0) seems to
+  provide the account name in canonical spelling, but fails with
+  an error in certain scenarios, such as running as LocalSystem.
+
+* (Kerberos-only workaround/change for S4U2Proxy)
+  Workaround for authentication scenarios involving
+  The REALM part of the initiators name retrieved through
+  QueryContextAttributes(NATIVE_NAMES) will now be forced to
+  uppercase after authentication.  For Windows and most
+  traditional Kerberos environments, this should not hurt.
+
+  But there seems to be at least one Microsoft-proprietary
+  "Protocol Transition with constrained delegation" usage
+  scenario that may get used by Citrix pass-thru authentication,
+  that causes the initiator name to pop up with a incorrect
+  lowercase realm name from QueryContextAttributes(NATIVE_NAMES),
+  which is a show-stopper for gssapi usage.
+
+  The new behaviour of forcing the Realm in the initiators name
+  to uppercase after AcceptSecurityContext() is the default.
+  I have added a Registry setting where that behaviour can be
+  reverted to leave the initiator's name as-is, by creating
+  a new registry key
+
+  user-specific setting:
+    SubKey:  HKEY_CURRENT_USER\SOFTWARE\SAP\gsskrb5
+    Entry:   ForceRealmToUpper
+    Type:    REG_DWORD
+    Value:   0 or 1   (default=1)
+
+  machine-wide setting:
+    SubKey:  HKEY_LOCAL_MACHINE\SOFTWARE\SAP\gsskrb5
+    Entry:   ForceRealmToUpper
+    Type:    REG_DWORD
+    Value:   0 or 1   (default=1)
+
+  Beware: When using 32-bit software on a 64-bit Window OS, the 64-bit
+  registry path is HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\SAP\gsskrb5  
+  
+
+
+24-Aug-2009: NTLM Release 1.0.7
+===============================
+* Fallback to QueryContextAttributes(NAMES) to determine the
+  remote peers name ImpersonateSecurityContext() fails (which
+  happens on W2K3+ because of Windows design change, introduction
+  of the "User Rights Assignment" "Impersonate a client after
+  authentication" in the Local Security Settings / Local Policies.
+
+  The use of ImpersonateSecurityContext()->OpenThreadToken()
+  ->GetTokenInformation()->RevertSecurityContext->LookupAccountSID()
+  was done in order to work around a longstanding LSA caching bug
+  when fallback to guest is permitted and happens -- in which case
+  QueryContextAttributes(NAMES) would return an invalid name
+  (the same invalid name was returned when calling LookupAccountSID
+   while still impersonating).
+
+
+16-Jun-2008: KRB5 Release 1.0.9
+==========================
+* Show the (abbreviated) name of the failing SSPI call for those
+  minor status codes (MECH_SPECIFIC codes) that represent
+  errors from SSPI as gssapi errors.
+
+* Trace enhancements (trace becomes only available by removing -DNDEBUG flag
+  in makekrb5.bat/makentlm.bat--DO NOT USE in production because of huge output):
+  provide more detailed status reporting for the result of every single
+  Windows SSPI call within gsskrb5.dll/gssntlm.dll
+
+* workaround for non-canonical Kerberos principal names being returned from
+  QueryCredentialsAttributes(NAMES) for the Kerberos SSP.  In case the
+  Kerberos credentials are from a Microsoft W2K+ Domain,
+  GetUserNameEx(NameUserPrincipal) returns the correct (canonical) spelling
+  of ones own Kerberos Principal most of the time, whereas GetUserName()
+  and QueryCredentialsAttributes(NAMES) show whatever was passed to logon.
+  So the idea for the workaround is to determine both
+  GetUserNameEx(NameUserPrincipal) and
+  QueryCredentialsHandle(AcquireCredentialsHandle(),NAMES), and
+  compare them case-insensitive -- and if they match, rely on the
+  spellig returned by GetUserNameEx() instead of that from
+  QueryCredentialsAttribute().
+
+* the above workaround makes gsskrb5.dll finally usable with the
+  computer account Kerberos credentials (available when running as
+  LocalSystem on a Win2K+ machine joined to a W2K+ domain).
+  The Kerberos principal name of a computer account is normally
+  upper-cased hostname followed by a dollarsign plus '@' plus realm,
+  i.e.   HOSTNAME$@YOUR.REALM
+  (where YOUR.REALM is often the all-uppercase DNS domain name).
+  A Computer account principal in the Microsoft Active Directory
+  always has at least one host-SPN assigned: "host/hostname@YOUR.REALM",
+  and sometimes also "host/hostname.f.q.d.n@YOUR.REALM" (the latter
+  is not always created.  You can use "SETSPN -R" to recreate the host
+  principals.
+
+  However, since SPNs in the Microsoft Active Directory are only Aliases
+  and *NOT* real Kerberos principals, you can NOT get initiating
+  credentials for host-SPNs, they only work as target name for
+  initiators/clients and when acquiring accepting/INBOUND credentials.
+
+  It is possible to run gsstest with gsskrb5.dll interactively under
+  Localsystem to see that it works in the following fashion:
+  get/download "psexec" from the PSTOOLS from www.sysinternals.com,
+  start a cmd.exe under localsystem like this:
+    psexec -s cmd.exe
+  and then run gsstest either with either (a) or (b).  (a) should
+  always work, and (b) depends on correct creation of host SPN
+  by the Domain Controller when the computer joined the domain.
+
+   (a)   gsstest -l gsskrb5.dll
+   (b)   gsstest -l gsskrb5.dll -a host/hostname@YOUR.REALM
+
+
+14-Sep-2004: Release 1.0.8
+==========================
+* Support for Win64 on AMD Athlon64/Opteron.
+  The resulting files are called gx64ntlm.dll and gx64krb5.dll.
+  Win64/Itanic files have been renamed: gi64ntlm.dll gi64krb5.dll
+
+* Workaround for Memory leak in Microsoft's SSPI function
+  QueryCredentialsAttributesA(NAMES) on all Win2K/WinXP releases
+  (up to and including Win2Ksp4 and WinXPsp2), but not W2K3.
+  This leak is critical to long-running Servers using gsskrb5.dll.
+  SSPI leaks 4 KBytes virtual and 40 Bytes non-paged pool memory
+  per API-call. The workaround is to call the WideChar version
+  QueryCredentialsAttributesW(NAMES) and manually convert the
+  return value to ANSI.  After around 32500 API-calls the
+  per-process quota limit on non-paged pool memory is reached
+  and further SSPI calls fail with SEC_E_INSUFFICIENT_MEMORY.
+  (Rational Purify 6 for Windows NT doesn't see this leak--AWWW!!)
+
+* Workaround to avoid (Event ID 673) with AD in W2K3 native mode.
+  By requesting the ISC_REQ_USE_SESSION_KEY context attribute when
+  trying to verify validity of **initiating** Kerberos credentials
+  user2user authentication will be requested instead of the
+  regular rfc-1964 authentication exchange.
+  An Active Directory in Windows2003 native mode will log Event
+  (ID 673) each time a NON user-2-user authentication is requested
+  for an account that does not have a service principal name
+  assigned, by default all accounts of regular (human) users.
+
+* Removed calls to GetUserNameEx() when trying to derive
+  one's own Kerberos principal name; it seems to be causing
+  problems for some of our customers and has never really worked
+  anyway.  SSPI in W2K+ contains the API calls GetUserNameEx()
+  and TranslateName(), unfortunately these calls can not reliably
+  be used to determine the *default* Kerberos Principal name of
+  an account in the Microsoft AD.  GetUserNameEx(NameUserPrincipal)
+  does return the *default* Kerberos Principal name on WinXP and
+  above, but fails always on a W2K machine with a W2K AD.
+  TranslateName() always queries the Active Directory, and fails
+  with ERROR_NONE_MAPPED when the Active Directory is W2K (not W2K3),
+  when no *explicit* mapping exist in the AD on all NT 5.x
+  platforms (W2K, WinXP, W2K3).  With a W2K AD, TranslateName()
+  will *NEVER* return the default mapping, whereas a W2K3 AD
+  seems to return it (although it shouldn't according to MS).
+
+* Incompatible change of Kerberos accepting (inbound) credentials
+  in WindowsXPsp2 (which will likely be reverted in a future
+  hotfix/service pack).
+  The Kerberos password is no longer being cached, however the
+  the resulting behaviour is inconsistent and non-intuitive.
+  Background: In Kerberos for the normal AP_REQ/AP_REP
+  authentication exchange the acceptor needs his longterm secret
+  (password) to open incoming service tickets.  In traditional
+  MIT Kerberos 5 an accepting credential is the longterm secret
+  stored in a file called keytab.  Regular users don't normally
+  have keytabs and therefore no accepting credentials.
+  The only possibility for (human) users to become targets/acceptors
+  in an authentication is "user2user" authentication, but this
+  protocol exchange is not part of the rfc1964 Kerberos gssapi
+  mechanism spec.
+
+  Microsoft did implement user2user authentication for their
+  Kerberos SSP (which other implementations of vanilla rfc1964 will
+  not understand).  The default inbound credentials can
+  use the existing TGT for accepting user2user authentication.
+
+  In addition, as the LSA of NT has traditionally been caching the
+  users password, Microsoft W2K Kerberos SSP did offer regular
+  accepting credentials based on the cached password from the
+  start.  And LSA will automatically refresh Kerberos TGTs
+  even if one manually purges them from the ticket cache
+  (e.g. using the tool "KLIST.EXE" from the W2K ResKit).
+
+  WinXPsp2 changes that, which does break some existing code.
+  Strangely, the password-based accepting credentials
+  are still available and accessible directly after logon, even
+  on WinXPsp2 (so somewhere the password is still being cached...).
+  But once a screen lock/unlock operation is performed, all further
+  SSPI operations that require password-based accepting
+  credentials will suddenly fail with SEC_E_NO_CREDENTIALS,
+  and all requests for initiating credentials with an
+  explicit name will start failing without the password.
+  The default initiating credentials still work, but the
+  Microsoft Kerberos SSP fails to match an explicitly
+  supplied name to these credentials.
+  Manual deletion of the TGTs from the ticket cache will
+  prevent all further Kerberos authentications on WinXPsp2
+  until a screen lock/unlock or logout/login is used
+  to request the password from the user in order to
+  acquire new TGTs.  (W2K, WinXPsp1 and W2K3 automatically
+  reacquire manually deleted TGTs.)
+
+  Similar to the problem with the SmartCard credentials,
+  Microsoft Kerberos SSP is unable to match explicitly
+  named credentials to existing TGTs when no (cached)
+  password is available, so the fallback to request default
+  credentials and matching them to an explicit name above
+  SSPI is even more important in gsskrb5.dll with WinXPsp2.
+
+
+05-Nov-2003: Release 1.0.7
+==========================
+* preliminary addition of acceptor side support for credential
+  delegation.  Unfortunately my "generic" code isn't generic
+  enough to wrap a mechanism credential, therefore I slightly
+  bent the internal layering and now call "gn_new_cred()" and
+  "gn_release_cred()" from within krb5_accept_sec_context()
+
+* new Workaround for Microsoft Kerberos problem with
+  SmartCard preauthentication:  If SmartCards are used for
+  preauthentication with Microsoft's Kerberos SSP then
+  AcquireCredentialsHandle() is unable to match a explicitly
+  supplied user name with the name from the TGT, ONLY request
+  for default (unnamed) credentials works.
+  So the workaround is to retry the unnamed credentials and
+  match them manually (=above SSPI) with the supplied explicit
+  kerberos principal name.
+  According to Microsoft (and in contradiction to their own
+  SSPI spec) the pszPrincipal parameter has always been and
+  still is completely ignored by both NTLM and Kerberos SSP,
+  and the support for the AUTH_IDENTITY structure is
+  painfully insufficient.
+
+
+* partial Workaround for Microsoft Windows 2003 Kerberos incompatibility
+  with rfc-1964 for Domains in Windows 2003 native mode (this problem
+  doesn't show with Windows 2003 Domains in mixed mode).
+
+  The source of the incompatibility is the addition of a protocol
+  extension for Kerberos user2user authentication which was done
+  in a fashion that clearly and seriously violates the GSS-API
+  architecture, the rfc-1964 Kerberos 5 gssapi mechanism and
+  also Microsoft's SSPI specification and architecture prior to
+  Windows 2003 (see also Microsoft Knowledgebase Article Q266080).
+
+  When a user account of in a Windows 2003 Domain in native mode
+  is used as a target, the W2K3 Kerberos SSP will use Microsoft's
+  new proprietary user2user token exchange (3-way or 4-way) for
+  authentication instead of the regular rfc-1964 token exchange
+  (1-way or 2-way).  When there is a "service principal name (SPN)"
+  defined in the Active Directory for the target account, then
+  the standardized rfc-1964 conformant token exchange is used.
+
+  The validation of initiating credentials built into gsskrb5.dll
+  will recognize and permit a user2user token exchange now.
+  (It would be so much easier if SSPI's AcquireCredentialsHandle()
+   would do its job correctly and perform this verification...)
+
+  The validation of accepting credentials built into gsskrb5.dll
+  will recognize the rfc-1964-incompatible token exchange and
+  fail with an error message indicating that there needs to
+  be a service principal name defined for the account.
+
+  user2user tokens showing up from InitializeSecurityContext()
+  will result in the error message that a service principal
+  name needs to be defined for the target's account.
+
+  To define a service principal name for a service user account
+  you can use the SETSPN.EXE command line tool from the
+  SUPPORT/TOOLS/SUPPORT.CAB archive on the Windows 2003 CD.
+
+    SETSPN -a <username>/spn <nt4-domain-name>\<username>
+
+  will do the trick.  Traditionally servers would be using
+  "hostbased service names" in Kerberos 5 containing the
+  fully qualified hostname (f.q.d.n) like this:
+
+    SETSPN -a <username>/f.q.d.n <nt4-domain-name>\<username>
+
+  however the only hostbased service name that Microsoft's
+  Kerberos supports in some way is the host/f.q.d.n principal
+  which is assigned to the PCs machine account in the Domain.
+  All other SPNs are fakes in that they seem to provide the
+  functionality but not the necessary protection against
+  session replay for seperate instances of the same
+  distributed service on different machines -- and this is one
+  of the vulnerabilities which their user2user extension
+  tries to work around (the other vulnerability is the
+  lack of strong random keys for service accounts).
+
+  Microsoft added user2user authentication with a seperate
+  mechanism OID on the context level tokens, however this
+  can NEITHER be selected NOR detected at the SSPI level.
+  Determining the behaviour a-priori would require heavy
+  and dead-slow Active Directory wizardry, and the dirty
+  workaround to prevent it would require domain admin
+  rights to set the SPN on the acceptors account...
+
+  gsskrb5.dll is strictly tied to the Kerberos SSP
+  and provides full rfc-2743 GSS-API compliance and
+  rfc-1964 interoperability, so it has always been peeking
+  into the parts of the context level tokens that are
+  clearly standardized by rfc-1964... which is why
+  the incompatible change of Windows 2003 Kerberos
+  broke gsskrb5.dll...
+
+
+09-Jul-2002: Release 1.0.6
+==========================
+Workarounds in gsskrb5.dll for new Microsoft Bugs:
+* Undocumented and unexpected alignment requirement
+  for the ContextToken input parameter to the SSPI
+  function ImportSecurityContext().  When the
+  supplied token is only 4-byte aligned DrWatson
+  will be called with an Alignment Exception (SIGBUS).
+
+* Re-appearance of a W2K-beta Kerberos SSP bug of
+  incomplete initialization when a new process
+  calls ImportSecurityContext() without having
+  ever called AcquireCredentialsHandle().
+  In this situation AcquireCredentialsHandle()
+  fails with SEC_E_INVALID_HANDLE which is a bug.
+
+  I reported a bug with the exact same effect
+  during W2K-beta and it is definitely fixed
+  in W2K final.  However W2Ksp2 is broken again,
+  as is Win64/Itanium.
+
+  The workaround is that krb5_import_sec_context()
+  requests and releases an initiating credentials
+  handle the first time it is called.
+
+* several small changes to accomodate Win64 builds:
+  - target "clean" will no longer remove "today.exe"
+    because a cross-compiled today.exe cannot
+    be directly executed...
+  - dependencies for the accompanying (old)
+    SSPI-related windows header files removed from
+    ntlm/Makefile and krb5/Makefile so that on Win64
+    the official Platform SDK Header files can be used
+  - makekrb5.bat and makentlm.bat try to determine
+    whether doing a Win32 native compile or a
+    Win64 (cross-)compile and choose appropriate
+    compiler flags accordingly
+  - added "debug" pseudo-target to makekrb5/makentlm
+    for building with debug compiler/linker options
+
+Still unresolved is a new Kerberos SSP bug that
+  shows in the Win32 Emulation on Win64.  There
+  the first call to AcceptSecurityContextA() results
+  in SEC_E_INSUFFICIENT_MEMORY when a NULL OutSecToken
+  is supplied accompanied with the ASC_REQ-Flag
+  ASC_REQ_ALLOCATE_MEMORY.  However gsskrb5.dll works
+  just fine on W2K-Win32 and Win64-native...
+
+* I fixed some very nasty bugs in MIT's gss-sample
+  where locally malloc()ed memory from recv_token()
+  was illegally passed to gss_release_buffer().
+
+  gss-sample was enhanced to allow passing a nametype-hint
+  as a prefix to the service name command line argument
+  for gss-server and gss-client:
+    u:service-name  -- import with GSS_C_NT_USER_NAME
+    s:service-name  -- import with GSS_C_NT_HOSTBASED_SERVICE
+    p:service-name  -- import with GSS_C_NO_OID
+
+  finally, it is now possible to start gss-server without
+  specifying a service-name (just a -port <portno>), in
+  which case it will request default accepting credentials
+  and inquire and print the name of these credentials.
+
+  Btw. use "makekrb5 sample" to build gss-sample
+       and "makekrb5 debug sample" to build a debug-version
+       and "makekrb5 clean-sample" to clean only gss-sample
+
+
+25-Oct-2001: Release 1.0.5
+==========================
+* Fix in gssntlm.dll: Release Process and Thread Tokens
+  acquired through OpenProcessToken() and OpenThreadToken()
+  via CloseHandle().  Windows NT was first shipped in 1993
+  and the Visual 98 compiler documentation still doesn't
+  document that a CloseHandle() is possible and even
+  necessary on the HTOKEN returned from  OpenThreadToken()
+  and OpenProcessToken().  Finally the most recent MSDN
+  documentation and new Code Samples correct this old and
+  really longstanding documentation bug which resulted
+  in about 10% of the bugfixes in WinNT4 service packs
+  (Handle leaks in almost every server/service of NT4)...
+
+
+24-Jan-2001:
+* Fix in gssntlm.dll: The workaround (from 1.0beta3) for the
+  bug in AcquireCredentialsHandle() breaks on the original
+  Releases of Windows 95 (Aug'95-release, OSR 2.0 and OSR 2.1).
+  The Unicode structure results in SEC_E_INVALID_TOKEN.
+  I have added a fallback to using an ANSI version of the
+  auth identity structure (OEM character corrected).
+
+
+31-Aug-2000: Release of Version 1.0beta4
+========================================
+* Fix: W2K Kerberos doesn't implement gssapi channel bindings,
+  however the wrapper only silently ignored them instead of
+  returning GSS_S_FAILURE and indicating the lack of this
+  feature when channel bindings were supplied by an application.
+  The README was updated to mention this missing feature.
+
+* A syntax error was fixed in a DEBUG_* statement, and some
+  DEBUG_ACTION() statments were added to the HostToRealm
+  mapping function.  GSSAPI-level tracing can be activated
+  by *removing* "-DNDEBUG" from the following line
+  in makekrb5.bat:
+     set DEFINES="-DWIN32 -DNDEBUG"
+
+* the OpenVision gss-sample was adopted from the
+  MIT Kerberos v1.0.5 distribution.  I needed a few changes
+  and additions to become usable on Win32 and with this
+  GSSAPI wrapper for W2K Kerberos.
+
+
+19-Jul-2000: Release of Version 1.0beta3
+========================================
+* There is now a Makefile and makeboth.bat to build the
+  multimechanism DLL "gssboth.DLL"
+
+* I have rearraged the Makefiles and bat-files so that
+  all three DLLs can be built without the need to
+  "clean" between the builds.  The generic and the
+  mechanism specific parts are now glued together
+  by the new source files "gsskrb5.c", "gssntlm.c",
+  "gssboth.c"
+
+* Fix: Account names with Umlauts didn't work with
+  gssntlm.DLL because of a BUG in Microsoft's NTLM SSP.
+  The names are now converted to and passed as
+  UNICODE via the AuthIdentity structure to
+  AcquireCredentialsHandle().  I haven't yet checked
+  whether the Kerberos SSP has the same bug.
+
+
+08-May-2000: Release of Version 1.0beta2
+========================================
+* The Kerberos initiating credentials will be queried for the
+  owner name when GetUserNameEx(NameUserPrincipal) fails.
+
+* Hostbased service names have been implemented, however they
+  will probably need extra configuration to determine the
+  realm mapping of native Kerberos realms.  See the discussion
+  of hostbased service names in the README.
+
+
+01-Apr-2000: Release of Version 1.0beta1
+========================================
+the current codebase provides enough of the look-and-feel of
+a Kerberos gssapi mechanism that our application will not see
+a difference from other Kerberos 5 implementations.
+
+
+
+HISTORY of gsskrb5
+==================
+
+In 1995/96 we added protection to the network communication of our
+legacy application and used the GSS-API to link with third-party
+software dynamically at runtime.  This requires a common binary
+interface for DLLs/shared libraries on all our supported platforms.
+
+MIT Kerberos 5 was the first GSS-API mechanism that was addressed,
+and a public key based mechanism using X.509 certificates was 2nd.
+However, the intention was to remain generic at the API level and
+to be able to operate the application on top of many different
+GSS-API mechanisms yet to be developped.
+
+To be able to verify correct application behaviour with arbitrary
+GSS-API mechanisms, I started writing a "generic" gssapi mechanism
+as a low-priority project.  Before I was able to complete it,
+we got a request from customers that wanted to use the single
+sign-on of their Microsoft platforms (NT Lan Manager) to log into
+our application as well.  That's when I started writing an
+adapter to NTLM of Win95/NT4 instead of a generic test mechanism.
+
+Later on during the Beta-stages of Windows2000, I converted the
+NTLM SSP wrapper into a wrapper for the Kerberos SSP providing
+conformance to rfc1964 and interoperability with MIT Kerberos 5,
+so that it can be used to access applications on non-Microsoft
+platforms as well.
+
+

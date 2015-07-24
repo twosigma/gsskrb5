@@ -1,0 +1,103 @@
+Building the DLL(s):
+====================
+
+The build environment is for a Microsoft Visual C++ Compiler.
+VC6 (Visual Studio 98) will work and is STRONGLY recommended.
+
+For the 64-bit builds I've been using the freely-available
+Windows 2003 SDK (sp1 and sp2 should work) with the
+cross-compilers for IA64 and AMD64.  In addition, it
+should compile with VS.NET 2003 (VC7) and VS.NET 2005 (VC8),
+but both of these require distribution of C-Runtime
+(VCREDIST.EXE) along with the generated DLLs, whereas
+VC6/VS98 doesn't need any of that, you can just copy
+the resulting DLLs onto just about any Win32 platform,
+Win9x->NT4->Win2K8 with no further dependencies.
+
+I have included several headers from the Microsoft compilers,
+otherwise it wouldn't compile independently from the build
+environment.
+You can use either NT4 or W2K for building both DLLs.
+(gsskrb5.dll will need a Kerberos SSP to run, so you
+ can build but not use it on NT4).
+
+Although I have included a workspace file (*.dsw) which
+I use during development, I consider them messy and confusing
+with respect to the compiler options.
+
+For Release builds ALWAYS use the command line build!
+
+
+Prerequisite:  you have a command line prompt (CMD.EXE)
+and the compiler enviroment is prepared (either by having
+Visual C installer frob your environment or by calling
+VCVARS32.BAT from the compiler installation).
+
+gsskrb5.DLL    	the GSS-API v2 wrapper for the
+		Microsoft Windows 2000 Kerberos SSP
+
+run  "makekrb5"
+
+gssntlm.DLL	the GSS-API v2 wrapper for the NTLM SSP
+		in Windows 9x, Windows NT 4 and Windows 2000
+
+run "makentlm"
+
+
+gssboth.DLL	the GSS-API v2 multi-mechanism wrapper for
+		the Kerberos 5 SSP in W2K and the the NTLM SSP
+		in Windows 9x, Windows NT 4 and Windows 2000
+
+run "makeboth"
+
+
+The following 'targets' are available for "makekrb5" and "makentlm":
+  opt         build an optimized version of the target (default!)
+  dbg         build a debug version of the target
+  clean       will remove all compiler generated files
+  pdb         ignored (deprecated parameter)
+  prerelease  creates a DLL with a prerelease FileVersion Resource
+
+In case that the automatic detection of your compiler does
+not work, you can force the setting by passing the following
+as the first parameter to makekrb5/makentlm:
+
+  vc6        for Visual Studio 98
+  vc7        for Visual Studio .NET 2003
+  vc8        for Visual Studio .NET 2005
+  sdk2003    for Windows 2003 SDK
+
+PDB files will always be created (even for opt builds)
+
+
+
+Installing the DLLs:
+====================
+Copy the DLL(s) whereever your application needs or likes it.
+This can be %SystemRoot%\system32, but it should work
+from everywhere.
+
+If your application expects a different library name
+(e.g. "gssapi32.dll"), then you can simply rename the DLL.
+
+Simple or old-fashionend applications that do not
+use LoadLibrary() to access the gssapi DLL may need the
+*.LIB stub instead of the DLL for the final link step.
+Those application will not be able to find a renamed
+DLL -- the name of the DLL is hardcoded into the *.LIB stub
+during its creation.
+
+
+Configuring/using the Windows2000 Kerberos SSP:
+===============
+There are no user tools to acquire Kerberos TGTs, as this
+is done by the LSA service automatically.  TGTs are also
+refreshed automatically.  Configuring other Kerberos
+KDCs and other Kerberos Realms for cross-realm authentication
+is described in a document from Microsoft.
+
+On April 1st, 2000, I could see this document in the following
+list of technical documents on the Microsoft Web Server:
+
+http://www.microsoft.com/windows2000/library/technologies/security/default.asp
+

@@ -1,0 +1,91 @@
+/************************************************************
+ * $Id: //tools/src/freeware/gsskrb5/gssntlm.rc#4 $
+ *
+ * DLL file version properties
+ ************************************************************/
+
+#include "version.h"
+#include "today.h"
+#include <winver.h>
+
+#ifdef NDEBUG
+#  ifdef PRERELEASE_DLL
+#    define VERS_BUILD 1
+#    define DEBUG_TAG -PreRelease
+#  else
+     /* release build */
+#    define VERS_BUILD 2
+#    define DEBUG_TAG -Release
+#  endif
+#else
+#  define VERS_BUILD 0
+#  define DEBUG_TAG -Debug
+#endif
+
+#define CONCAT(x,y) XSTR( HIDE(x) ## HIDE(y) )
+#define PROD_VERSION HIDE(NTLM_VERS_MAJOR) ## . ## HIDE(NTLM_VERS_MINOR) ## . ## HIDE(NTLM_VERS_PATCH)
+#define HIDE(x) x
+#define STR(x)  # x
+#define XSTR(x) STR(x)
+
+
+1 VERSIONINFO
+
+  FILEVERSION      NTLM_VERS_MAJOR, NTLM_VERS_MINOR, NTLM_VERS_PATCH, VERS_BUILD
+  PRODUCTVERSION   NTLM_VERS_MAJOR, NTLM_VERS_MINOR, NTLM_VERS_PATCH, VERS_BUILD
+
+  FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+#ifdef _DEBUG
+  FILEFLAGS     VS_FF_DEBUG
+#else
+  FILEFLAGS     VS_FF_SPECIALBUILD
+#endif
+#ifdef _WIN64
+  FILEOS	VOS_NT
+#else
+  FILEOS        VOS_NT_WINDOWS32
+#endif
+
+  FILETYPE      VFT_DLL
+  FILESUBTYPE   0x0L
+
+  BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+      BLOCK "000004b0"
+      BEGIN
+	VALUE "Comments", "Open Source Implementation by SAP AG, ftp://ftp.sap.com/pub/ietf-work/gssapi/gsskrb5/"
+        VALUE "CompanyName", "SAP AG, Walldorf, Germany"
+        VALUE "LegalCopyright", LIBRARY_COPYRIGHT
+	VALUE "License",	"OpenSource/Freeware"
+        VALUE "FileDescription", "GSS-API v2 for Microsoft NTLM SSP"
+        VALUE "FileVersion", XSTR(NTLM_VERS_MAJOR) "." XSTR(NTLM_VERS_MINOR) "." XSTR(NTLM_VERS_PATCH) "." XSTR(VERS_BUILD)
+#if defined(_WIN64) && defined(_M_IA64)
+        VALUE "InternalName",     CONCAT(GI64NTLM,DEBUG_TAG)
+        VALUE "OriginalFilename", "GI64NTLM.DLL"
+	VALUE "Target Platform",  "Intel ia64/Itanium"
+#elif defined(_WIN64) && defined(_M_AMD64)
+        VALUE "InternalName",     CONCAT(GX64NTLM,DEBUG_TAG)
+        VALUE "OriginalFilename", "GX64NTLM.DLL"
+	VALUE "Target Platform",  "x86_64/AMD64/x64"
+#else
+        VALUE "InternalName",     CONCAT(GSSNTLM,DEBUG_TAG)
+        VALUE "OriginalFilename", "GSSNTLM.DLL"
+	VALUE "Target Platform",  "Intel ia32/x86"
+#endif
+        VALUE "ProductName", "GSS-API v2 Wrapper for Microsoft's NTLM Security Service Provider"
+        VALUE "ProductVersion", XSTR(PROD_VERSION) " " " "
+#ifdef _WIN64
+	VALUE "SAP compatibility", "For all SAP WebAS Releases"
+#else
+	VALUE "SAP compatibility", "For all SAP WebAS and R/3 Releases >=3.1I"
+#endif
+        VALUE "Build Date", TODAYS_DATE
+      END
+    END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x0, 1200
+  END
+END
+
