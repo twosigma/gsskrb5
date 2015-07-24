@@ -150,7 +150,7 @@ krb5_acquire_cred( OM_uint32          * pp_min_stat,    /* out  */
    size_t                    user_len     = 0;
    size_t                    realm_len    = 0;
    size_t                    principal_len;
-   int			     cred_ok;
+   int			     cred_ok = FALSE;
    ULONG	             CredentialUse;
    SECURITY_STATUS	     SecStatus;
    SEC_WINNT_AUTH_IDENTITY   AuthIdentity;
@@ -344,6 +344,8 @@ krb5_acquire_cred( OM_uint32          * pp_min_stat,    /* out  */
                }
             }
          }
+      } else  {
+         cred_ok = TRUE;
       }
    } else {
       if ( FALSE!=krb5_icred_nocheck ) {
@@ -357,6 +359,8 @@ krb5_acquire_cred( OM_uint32          * pp_min_stat,    /* out  */
                }
             }
          }
+      } else  {
+         cred_ok = TRUE;
       }
    }
 
