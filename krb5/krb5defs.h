@@ -140,8 +140,6 @@ extern DWORD		        krb5_platform_major;
 extern BOOLEAN                  krb5_realm_to_upper;  /* Whether to force initiators realm to UpperCase after AcceptSecurityContext() */
 extern BOOLEAN			krb5_have_directory;
 extern BOOLEAN                  krb5_ctx_noexpire;
-extern BOOLEAN                  krb5_icred_nocheck;
-extern BOOLEAN                  krb5_acred_nocheck;
 
 OM_uint32  krb5_load_dll( OM_uint32 * pp_min_stat );
 OM_uint32  krb5_unload_dll( void );

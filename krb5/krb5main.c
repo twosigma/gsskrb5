@@ -80,8 +80,6 @@ BOOLEAN			 krb5_have_directory = FALSE; /* Flag whether we have access to */
 						      /* TranslateName() may be used    */
 						      /* during name canonicalization   */
 BOOLEAN                  krb5_ctx_noexpire   = FALSE; /* SSPI bug workaround: SSPI reports defective lifetimes */
-BOOLEAN                  krb5_icred_nocheck  = FALSE; /* SSPI bug workaround: defective initiator credentials */
-BOOLEAN                  krb5_acred_nocheck  = FALSE; /* SSPI bug workaround: defective acceptor  credentials */
 
 struct gn_mechanism_s
     krb5_mechanism = {
@@ -227,14 +225,6 @@ krb5_initialize( OM_uint32 * pp_min_stat )
 
    if ( KRB5_HAVE_TWEAK==krb5_query_registry_tweak("ForceCtxNoExpire", &dwValue) ) {
       krb5_ctx_noexpire = (0==dwValue) ? FALSE : TRUE;
-   }
-
-   if ( KRB5_HAVE_TWEAK==krb5_query_registry_tweak("ForceAccCredOK", &dwValue) ) {
-      krb5_acred_nocheck = (0==dwValue) ? FALSE : TRUE;
-   }
-
-   if ( KRB5_HAVE_TWEAK==krb5_query_registry_tweak("ForceIniCredOK", &dwValue) ) {
-      krb5_icred_nocheck = (0==dwValue) ? FALSE : TRUE;
    }
 
    maj_stat = gn_register_min_stat( pp_min_stat, &(krb5_reg_min_stat[0]) );
