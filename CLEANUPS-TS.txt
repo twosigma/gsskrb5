@@ -1,0 +1,90 @@
+
+These changes were made for Two Sigma, though they are generic:
+
+ - Make context expiration advisory
+   
+   It's been years now since the MIT and Heimdal and KITTEN communities have
+   settled that GSS security context expiration should be advisory.  This means
+   that the per-message token functions must not fail when the context expiration
+   time is in the past.  This commit implements this.
+
+ - Ignore jgss flags change
+
+ - Fix hbs canonicalization
+
+   Do not resolve hostnames in host-based service names.
+
+   Do not attempt to find realms for host-based service names (Windows/AD know
+   how to do this just fine, thank you).
+
+   Don't lose track of whether a name was a host-based service.
+
+ - Drop unnecessary cred checks
+
+   Do not attempt to validate credentials by attempting to use them.  This is
+   not useful.  Time-of-use failure is fine.
+
+ - Initialize cred_ok and set true when not checking
+
+   Fixes a credential handle validation bug where garbage on the stack
+   prevented use of credentials when validation was disabled.
+
+ - Fix today.h build
+
+   TODO: Figure out how to use strerror() correctly on WIN32.
+
+TODO:
+
+ - Go over everything with a fine-tooth comb.
+
+ - gss_accept_sec_context(), specifically krb5/krb5ctx.c:krb5_accept_sec_context()
+   saves the acceptor credential handle's name as the target principal name,
+   but instead it should call QueryContextAttributes() to get the
+   SECPKG_ATTR_CLIENT_SPECIFIED_TARGET...
+
+   This is unlikely to be a problem at this time.
+
+ - Remove remaining possibly-silly attempts to determine a realm for
+   unqualified usernames.
+
+    - Remove fail-early code in krb5_load_dll() (which fails if it can't figure
+      out the user's default credentials' name).
+
+    - Remove / massage code in krb5_parse_name() that attempts to determine a
+      default principal name (why would this belong here?!).
+
+ - Check whether it'd be best to remove this sort of code from krb5/krb5cred.c:
+
+312    maj_stat = krb5_determine_cred_owner( pp_min_stat, &(pcred->sspi_cred),
+313                                          (Uchar **) &(pcred->name), &(pcred->name_len) );
+314    if ( GSS_S_COMPLETE!=maj_stat )
+315        goto error;
+
+   Removing this means having to put the desired name into pcred->name.  We
+   could keep the call to krb5_determine_cred_owner() when desired_name is the
+   GSS_C_NO_NAME (default name).
+
+ - Check whether it'd be best to remove this sort of code from krb5/krb5cred.c:
+
+317    if ( principal!=NULL ) {
+318       /* credentials were requested for an explicit name    */
+319       /* verify if the credentials are those that we expect */
+320       /* -- never trust SSPI!                               */
+321       if ( pcred->name_len!=principal_len  ||  strcmp(pcred->name, principal) ) {
+322          sy_clear_free( (void **) &pcred->name, pcred->name_len );
+323          pcred->name_len = 0;
+324          ERROR_RETURN( KRB5_MINOR(SSPI_BAD_CRED_NAME), GSS_S_NO_CRED );
+325       }
+326    }
+
+   After all we probably do trust SSPI as the rest of the system does.  Why
+   shouldn't we?!
+
+ - Note I18N issues:
+
+    - gsskrb5 uses ANSI for principal naming, whereas it should use UTF-8,
+      really (RFCs 2743/2744 refer to Latin-1, but, really, we should use
+      UTF-8).
+
+      We don't really care because we don't create principals with non-ASCII
+      names, thus we need only note this, not fix it.
