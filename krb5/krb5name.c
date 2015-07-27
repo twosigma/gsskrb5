@@ -541,193 +541,6 @@ krb5_compose_name(   OM_uint32     *  pp_min_stat,
 
 
 /*********************************************************************
- * krb5_find_realm_for_host()
- *
- * Find the Kerberos REALM name for a host (must be FQDN!)
- *
- *********************************************************************/
-OM_uint32
-krb5_find_realm_for_host( OM_uint32	    * pp_min_stat,
-			  char		    * p_fqdn,
-			  char		   ** pp_realm,
-			  size_t	    * pp_realm_len )
-{
-   char		  * this_Call	    = "krb5_find_realm_for_host";
-   char		  * ptr		    = NULL;
-   char		  * domain	    = NULL;
-   char		    tmpfqdn[KRB5_MAX_NAMELEN];
-   size_t	    len;
-   size_t           fqdn_len;
-   size_t	    domain_len;
-   LONG		    Status;
-   HKEY		    PRV_key	    = (HKEY)0;  /* dynamic, close on exit */
-   OM_uint32	    maj_stat	    = GSS_S_COMPLETE;
-   Uint		    i;
-   Uchar            uch;
-
-   (*pp_realm)	   = NULL;
-   (*pp_realm_len) = 0;
-
-   if ( p_fqdn==NULL || p_fqdn[0]==0 ) {
-      DEBUG_ERR((tf, "ERR: %s(): missing FQDN\n", this_Call ));
-      ERROR_RETURN( MINOR_HOSTNAME_MISSING, GSS_S_BAD_NAME );
-   }
-
-   fqdn_len = strlen(p_fqdn);
-   if ( fqdn_len==0 || fqdn_len>=KRB5_MAX_NAMELEN ) {
-	    DEBUG_ERR((tf, "ERR: %s(): fqdn is too long %lu chars (max=%lu)\n",
-			   this_Call, (Ulong)fqdn_len, (Ulong)KRB5_MAX_NAMELEN ));
-	    ERROR_RETURN( MINOR_NAME_TOO_LONG, GSS_S_BAD_NAME );
-   }
-
-   strcpy(tmpfqdn, p_fqdn);
-   while( fqdn_len>0 && tmpfqdn[fqdn_len-1]=='.' ) {
-      /* stip all trailing dots (there shouldn't be any) */
-      fqdn_len--;
-      tmpfqdn[fqdn_len] = 0;
-   }
-
-   domain = strchr( tmpfqdn, '.' );
-   if ( domain==NULL || domain[1]=='.' ) {
-       /* The hostname is not a fully qualified domain name */
-       DEBUG_ERR((tf, "ERR: Hostname \"%.250s\" is not fully qualified, cannot determine Realm\n", tmpfqdn ));
-       ERROR_RETURN( KRB5_MINOR(NO_FQDN_HOSTNAME), GSS_S_BAD_NAME );
-   }
-
-   domain_len = strlen(domain);
-
-   DEBUG_ACTION((tf, "  A: Realm lookup for host=\"%s\", domain=\"%s\"\n", tmpfqdn, domain ));
-
-   /**************************************************************************/
-   /* Check the Registry whether there are any HostToRealm Mappings defined  */
-   /* The syntax is similar to the [domain_realm] section of MIT's krb5.conf */
-   /**************************************************************************/
-   Status = RegOpenKeyEx(  (HKEY)HKEY_LOCAL_MACHINE,
-			   "SYSTEM\\CurrentControlSet\\Control\\Lsa\\Kerberos\\HostToRealm",
-			   0,
-			   KEY_READ,
-			  &PRV_key );
-
-   if ( Status==ERROR_SUCCESS ) {
-      char   Value[KRB5_MAX_NAMELEN-10];  /* Yup, this is a hardcoded name length limit here */
-      DWORD  ValueLen;
-      char   Data[KRB5_MAX_NAMELEN-10];   /* Another hardcoded name length limit */
-      DWORD  DataLen;
-      DWORD  Index;
-      DWORD  MatchLength = 0;
-      DWORD  Type;
-
-      Index = 0;
-      do {
-	 /* There are HostToRealm mappings defined in the Registry */
-	 ValueLen = sizeof(Value)-1;
-	 DataLen  = sizeof(Data)-1;
-	 Status = RegEnumValue( PRV_key, Index, Value, &ValueLen, 0, &Type, Data, &DataLen );
-	 if ( Status==ERROR_SUCCESS && ValueLen>0 ) {
-	    Value[ValueLen] = 0; /* Workaround for Win32 ANSI-API bug (maybe they fixed it?) */
-	    Data[DataLen]   = 0; /* Workaround for Win32 ANSI-API bug (maybe they fixed it?) */
-
-	    DEBUG_ACTION((tf, "  A: RegEnumValue() Key#%d Value=\"%s\", Data=\"%s\"\n", (int)Index, Value, Data ));
-
-	    while( ValueLen>1 && Value[ValueLen-1]=='.' ) {
-	       /* strip any trailing dots for comparison -- these shouldn't be there */
-	       ValueLen--;
-	       Value[ValueLen] = 0;
-	    }
-
-	    if ( Value[0]=='.'   /* Value starts with a dot -- this is a Domain entry */
-		 &&  ValueLen<=domain_len      /* only if Value could be a substring of domain */
-		 &&  ValueLen>MatchLength ) {  /* and if ValueLen is larger than a previous match */
-	       
-	       if ( sy_strncasecmp(Value, &(domain[domain_len-ValueLen]), ValueLen)==0 ) {
-		  /* we found a matching domain */
-		  MatchLength = ValueLen;
-		  if ( (*pp_realm)!=NULL ) { sy_clear_free( pp_realm, *pp_realm_len ); } /* free previous entry */
-		  (*pp_realm) = sy_malloc( DataLen+1 );
-		  if ( (*pp_realm)==NULL )
-		     ERROR_RETURN(MINOR_OUT_OF_MEMORY, GSS_S_FAILURE);
-
-		  strcpy( (*pp_realm), Data );
-		  (*pp_realm_len) = DataLen;
-
-		  /* continue through the loop, there might be a longer match */
-	       }
-	    
-	    } else { /* Value is a plain Hostname entry */
-
-	       if ( sy_strcasecmp(Value, tmpfqdn)==0 ) {
-		  /* We found a matching host entry */
-		  if ( (*pp_realm)!=NULL ) { sy_clear_free( pp_realm, *pp_realm_len ); } /* free previous entry */
-		  (*pp_realm) = sy_malloc( DataLen + 1 );
-		  if ( (*pp_realm)==NULL )
-		     ERROR_RETURN(MINOR_OUT_OF_MEMORY, GSS_S_FAILURE);
-
-		  strcpy( (*pp_realm), Data );
-		  (*pp_realm_len) = DataLen;
-
-		  /* This was an exact match, so break out of the Loop */
-		  break;
-	       }
-	    }
-	 }
-
-	 Index++;
-
-      } while( Status==ERROR_SUCCESS ); /* !=ERROR_NO_MORE_ITEMS ? */
-
-   } /* have HostToRealm mappings */
-
-   /*****************************************************************/
-   /* If we get here without having found a REALM among the Values  */
-   /* of the HostToRealm key, then we are going to derive the Realm */
-   /* from the DNS domain of the given FQDN.			    */
-   /*****************************************************************/
-
-   if ( (*pp_realm)==NULL ) {
-
-      domain++; /* move past the leading DOT */
-
-      len = strlen( domain );
-      (*pp_realm) = sy_malloc( len + 1 );
-      if ( (*pp_realm)==NULL )
-	 ERROR_RETURN( MINOR_OUT_OF_MEMORY, GSS_S_FAILURE );
-      
-      (*pp_realm_len) = len;
-
-      /* copy and uppercase the DNS Domain name */
-      for( i=0; i<len ; i++ ) {
-	 uch = (Uchar) domain[i];
-	 (*pp_realm)[i] = (char) ( islower(uch) ? toupper(uch) : uch );
-      }
-
-      /* append the trailing NUL */
-      (*pp_realm)[len] = 0;
-
-      DEBUG_ACTION((tf, "  A: DNS-Domain  derived Realm: \"%s@%s\"\n", p_fqdn, (*pp_realm) ));
-
-   } else {/* have a realm */
-
-      DEBUG_ACTION((tf, "  A: HostToRealm derived Realm: \"%s@%s\"\n", p_fqdn, (*pp_realm) ));
-
-   }
-
-
-   if ( maj_stat!=GSS_S_COMPLETE ) {
-error:
-      if ( (*pp_realm)!=NULL ) { sy_clear_free( pp_realm, *pp_realm_len ); }
-      (*pp_realm)     = NULL;
-      (*pp_realm_len) = 0;
-   }
-
-   if ( PRV_key!=(HKEY)0 ) { RegCloseKey( PRV_key );  PRV_key = (HKEY)0; }
-
-   return(maj_stat);
-
-} /* krb5_find_realm_for_host() */
-
-
-
-/*********************************************************************
  * krb5_canonicalize_name()
  *
  *********************************************************************/
@@ -785,9 +598,6 @@ krb5_canonicalize_name( OM_uint32        *  pp_min_stat,
       }
 
       fqdn = ptr+1;
-      maj_stat = krb5_find_realm_for_host( pp_min_stat, fqdn, &realm, &realm_len );
-      if ( GSS_S_COMPLETE!=maj_stat )
-	 goto error;
 
 /* Cleanup Alert: the following function call allocates the temporary name in user */
       user = sy_malloc( p_ilen + 1 );
@@ -797,11 +607,12 @@ krb5_canonicalize_name( OM_uint32        *  pp_min_stat,
       user_len = p_ilen;
       memcpy( user, p_iname, user_len );
 
-      user[user_len]    = '\0';   /* NUL-Termination of string			     */
-      user[ptr-p_iname] = '/';	  /* replace '@' with '/' to seperate name from host */
+      user[user_len]    = '\0';
+      user[ptr-p_iname] = '/';
 
-      maj_stat = krb5_compose_name( pp_min_stat, realm, user, (Uchar **) pp_oname, pp_olen );
-
+      *pp_oname = user;
+      *pp_olen = user_len;
+      user = NULL;
    } else if ( NT_USER_NAME==p_nt_itag  ||  p_nt_itag==krb5_nt_tag
 	       ||  NT_DEFAULT==p_nt_itag ) {
 
@@ -948,9 +759,10 @@ error:
       sy_clear_free( (void **) pp_oname, *pp_olen );
 
    } else {
-
-      (*pp_nt_otag) = krb5_nt_tag;  /* this is krb5's canonical nametype */
-				    /* (well, except for anonymous names) */
+      if ( p_nt_itag==NT_HOSTBASED_SERVICE )
+         *pp_nt_otag = p_nt_itag;
+      else
+         *pp_nt_otag = krb5_nt_tag;
    }
 
    sy_clear_free( (void **) &user,      user_len      );

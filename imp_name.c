@@ -149,7 +149,6 @@ gn_gss_import_name(
 	 if ( nt_tag==NT_HOSTBASED_SERVICE
 	      ||  nt_tag==NT_HOSTBASED_SERVICE_X ) {
 	    /* Hostbased Service Names get a special treatment,   */
-	    /* the hostname will immediately resolved/appended    */
 	    char     * ptr;
 	    size_t     len, svclen;
 
@@ -163,7 +162,7 @@ gn_gss_import_name(
 	    ptr = (char *) memchr(tmpbuf, '@', len);
 
 	    if ( ptr!=NULL ) {
-	       /* '@' found in supplied name, check and resolve hostname */ 
+	       /* '@' found in supplied name, check hostname */ 
 	       svclen = ( ptr - tmpbuf ) + 1;
 
 	       if ( ptr==tmpbuf ) {
@@ -172,14 +171,6 @@ gn_gss_import_name(
 	       if ( svclen==len ) {
 		  RETURN_MIN_MAJ( MINOR_HOSTNAME_MISSING, GSS_S_BAD_NAME );
 	       }
-
-	       /* resolve supplied hostname       */
-	       /* NOTE: we're resolving INPLACE!! */
-	       maj_stat = sy_resolve_hostname( pp_min_stat,
-					       &(tmpbuf[svclen]),
-					       &(tmpbuf[svclen]),
-					       sizeof(tmpbuf) - svclen - 2 );
-
 	    } else { /* ptr==NULL    i.e. no '@' found in supplied name */
 
 	       tmpbuf[len++] = '@';
