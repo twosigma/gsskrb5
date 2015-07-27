@@ -73,7 +73,6 @@ gn_gss_verify_mic(
    size_t	       mic_len	 = 0;
    gn_mech_tag_et      mech_tag  = MECH_INVALID_TAG;
    OM_uint32	       maj_stat  = GSS_S_COMPLETE;
-   OM_uint32	       lifetime;
 
 
    (*pp_min_stat)   = MINOR_NO_ERROR;
@@ -96,10 +95,6 @@ gn_gss_verify_mic(
       return(maj_stat);
 
    ctx = (gn_context_desc *)(p_in_context);
-
-   maj_stat = gn_context_time( pp_min_stat, ctx, &lifetime );
-   if (maj_stat!=GSS_S_COMPLETE)
-      return(maj_stat);
 
    if ( (gn_mech[ctx->mech_tag]->use_raw_tokens) ) {
       /* this mechanism wants raw tokens, so we don't look at the framing */

@@ -72,7 +72,6 @@ gn_gss_get_mic(
    size_t	       mic_len	 = 0;
    OM_uint32	       maj_stat  = GSS_S_COMPLETE;
    OM_uint32	       min_stat;
-   OM_uint32	       lifetime;
 
 
    (*pp_min_stat)   = MINOR_NO_ERROR;
@@ -98,10 +97,6 @@ gn_gss_get_mic(
       return(maj_stat);
 
    ctx = (gn_context_desc *)(p_in_context);
-
-   maj_stat = gn_context_time( pp_min_stat, ctx, &lifetime );
-   if (maj_stat!=GSS_S_COMPLETE)
-      return(maj_stat);
 
 /* Cleanup Alert:  the next call will probably create a */
 /*		   dynamically allocated MIC-token 	*/

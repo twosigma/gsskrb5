@@ -76,7 +76,6 @@ gn_gss_wrap(
    size_t	       wrap_token_len	= 0;
    OM_uint32	       maj_stat		= GSS_S_COMPLETE;
    OM_uint32	       min_stat;
-   OM_uint32	       lifetime;
    int		       conf_state       = FALSE;
 
 
@@ -104,10 +103,6 @@ gn_gss_wrap(
       return(maj_stat);
 
    ctx = (gn_context_desc *)(p_in_context);
-
-   maj_stat = gn_context_time( pp_min_stat, ctx, &lifetime );
-   if (maj_stat!=GSS_S_COMPLETE)
-      return(maj_stat);
 
 /* Cleanup Alert:  the next call will probably create a */
 /*		   dynamically allocated WRAP-token 	*/
