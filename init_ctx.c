@@ -142,11 +142,13 @@ gn_gss_init_sec_context(
 	 RETURN_MIN_MAJ( MINOR_TARGET_CHANGED, GSS_S_FAILURE );
       }
 
+#if 0
       if ( ctx->service_req!=p_in_flags ) {
 	 DEBUG_ERR((tf, "  E: %s(): different service options since last call!\n",
 			this_Call))
 	 RETURN_MIN_MAJ( MINOR_FLAGS_CHANGED, GSS_S_FAILURE );
       }
+#endif
 
       if ( p_in_mech!=GSS_C_NO_OID ) {
          maj_stat = gn_oid_to_mech_tag( pp_min_stat, p_in_mech, &mech_tag );
