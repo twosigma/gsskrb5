@@ -123,11 +123,6 @@ gn_gss_compare_name(
 	       &&  pname2->mech_tag!=MECH_INVALID_TAG ) {
       /* both names are MNs */
 
-      if ( pname1->nt_tag!=pname2->nt_tag ) {
-	 /* The two MNs are of a different Nametype */
-	 return(GSS_S_BAD_NAMETYPE);
-      }
-
       if ( pname1->mech_tag!=pname2->mech_tag ) {
 
 	 /* The two MNs have the same Nametype but differing mechanisms  */
@@ -175,28 +170,18 @@ gn_gss_compare_name(
       if (maj_stat!=GSS_S_COMPLETE)
 	 goto cleanup;
 
-      if (tmp_nt_tag==pname1->nt_tag) {
+      if ( tmp_name_len==pname1->name_len
+	   &&  !memcmp(tmp_name, pname1->name, tmp_name_len) ) {
 
-	 if ( tmp_name_len==pname1->name_len
-	      &&  !memcmp(tmp_name, pname1->name, tmp_name_len) ) {
+	 /* internal binary names match */ 
+	 (*pp_out_result) = TRUE;
 
-	    /* internal binary names match */ 
-	    (*pp_out_result) = TRUE;
+      } else {
 
-	 } else {
+	 /* internal binary names do not match */
+	 (*pp_out_result) = FALSE;
 
-	    /* internal binary names do not match */
-	    (*pp_out_result) = FALSE;
-
-	 }
-
-      } else { /* tmp_nt_tag!=pname1->nt_tag */
-
-	 /* canonical Nametypes don't match, */
-	 /* names are not comparable         */
-	 maj_stat = GSS_S_BAD_NAMETYPE;
-
-      }  /* tmp_nt_tag!=pname1->nt_tag */
+      }
 
    }
 

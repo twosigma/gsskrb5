@@ -791,7 +791,7 @@ krb5_display_name( OM_uint32  * pp_min_stat,   gn_nt_tag_et    p_nt_tag,
    (*pp_oname)    = NULL;
    (*pp_olen)     = 0;
 
-   if ( p_nt_tag!=krb5_nt_tag ) {
+   if ( p_nt_tag!=krb5_nt_tag && NT_HOSTBASED_SERVICE != p_nt_tag) {
 
       /* Only mech-specific (i.e. canonical) names will ever get in */
       /* here.  We reject everything else                           */

@@ -288,7 +288,7 @@ main( int argc, char **argv )
 	      rc = 1;
 	   } else {
 
-	      rc |= display_name( "reimported", ini_name );
+	      rc |= display_name( "duplicated", dup_name );
 
 	   }
 
