@@ -1,3 +1,11 @@
+
+This is the Two Sigma Open Source fork of SAP's GSS->SSPI bridge, which
+can be found at:
+
+https://www.kerberos.org/software/samples/gsskrb5/
+
+
+
 Release notes for gsskrb5 v1.09
 
  17-Jun-2008  Martin Rex  <Martin.Rex@sap.com>
